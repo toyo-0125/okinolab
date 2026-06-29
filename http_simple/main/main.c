@@ -33,6 +33,7 @@
 //making point
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "temprature.h"
 
 #endif  // !CONFIG_IDF_TARGET_LINUX
 
@@ -364,6 +365,8 @@ static esp_err_t status_get_handler(httpd_req_t *req)
         // ip_info.ip にIPアドレスが入る
     }
 
+    float cpu_temp = get_cpu_temprature();
+
     snprintf(response, sizeof(response),
              "<html><body>"
              "<h1>ESP32 Attack Monitor</h1>"
@@ -372,6 +375,7 @@ static esp_err_t status_get_handler(httpd_req_t *req)
              "<p>Uptime : %02d:%02d:%02d</p>"
              "<p>Wi-Fi RSSI : %d dBm</p>"
              "<p>IP Address : " IPSTR "</p>"
+             "<p>CPU Temp :  %.1lf temp </p>"
              "</body></html>",
              request_count,
              free_heap,
@@ -379,7 +383,8 @@ static esp_err_t status_get_handler(httpd_req_t *req)
              min,
              sec,
              ap_info.rssi,
-            IP2STR(&ip_info.ip));
+             IP2STR(&ip_info.ip),
+             cpu_temp);
 
     httpd_resp_set_type(req, "text/html");
     httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
