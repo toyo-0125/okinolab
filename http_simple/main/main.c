@@ -32,6 +32,7 @@
 
 //making point
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 
 #endif  // !CONFIG_IDF_TARGET_LINUX
 
@@ -42,8 +43,13 @@
  */
 
 static const char *TAG = "example";
+
 //making point
 static int request_count = 0;
+
+
+wifi_ap_record_t ap_info;
+
 
 #if CONFIG_EXAMPLE_BASIC_AUTH
 
@@ -335,18 +341,45 @@ static esp_err_t status_get_handler(httpd_req_t *req)
 {
     request_count++;
 
-    char response[256];
+    int64_t uptime_us = esp_timer_get_time();
+    int uptime_sec = uptime_us / 1000000;//change ms to s
+    int hour = uptime_sec / 3600;
+    int min = (uptime_sec % 3600) / 60;
+    int sec = uptime_sec % 60;
+
+    char response[512];
 
     size_t free_heap = esp_get_free_heap_size();
+
+    wifi_ap_record_t ap_info;
+
+    if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
+        ap_info.rssi = 0;
+    }
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif != NULL &&
+        esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+        // ip_info.ip にIPアドレスが入る
+    }
 
     snprintf(response, sizeof(response),
              "<html><body>"
              "<h1>ESP32 Attack Monitor</h1>"
              "<p>Request Count : %d</p>"
              "<p>Free Heap : %u bytes</p>"
+             "<p>Uptime : %02d:%02d:%02d</p>"
+             "<p>Wi-Fi RSSI : %d dBm</p>"
+             "<p>IP Address : " IPSTR "</p>"
              "</body></html>",
              request_count,
-             free_heap);
+             free_heap,
+             hour,
+             min,
+             sec,
+             ap_info.rssi,
+            IP2STR(&ip_info.ip));
 
     httpd_resp_set_type(req, "text/html");
     httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
