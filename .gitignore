@@ -1,0 +1,19 @@
+# Windows
+desktop.ini
+Thumbs.db
+
+# Build output
+**/build/
+
+# ESP-IDF
+**/sdkconfig.old
+
+# VSCode
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log

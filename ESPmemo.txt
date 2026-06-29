@@ -1,0 +1,7 @@
+
+ESP ID : esp-idf-0911628cc8d14ab6a6aa44e6ce731a47
+
+wifi SSID : aterm-13bf8f-g  [2.4GHz]
+PASSWORD : 567176eb4ca23
+
+link : http://192.168.10.113/
