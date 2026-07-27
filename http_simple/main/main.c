@@ -34,6 +34,7 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "temprature.h"
+#include "cpu_usage.h"
 
 #endif  // !CONFIG_IDF_TARGET_LINUX
 
@@ -342,60 +343,186 @@ static esp_err_t status_get_handler(httpd_req_t *req)
 {
     request_count++;
 
-    int64_t uptime_us = esp_timer_get_time();
-    int uptime_sec = uptime_us / 1000000;//change ms to s
-    int hour = uptime_sec / 3600;
-    int min = (uptime_sec % 3600) / 60;
-    int sec = uptime_sec % 60;
+    httpd_resp_set_type(req, "text/html");
 
-    char response[512];
+    httpd_resp_sendstr_chunk(req,
+        "<!DOCTYPE html>"
+        "<html>"
+        "<head>"
+        "<meta charset=\"UTF-8\">"
+        "<title>ESP32 Attack Monitor</title>"
+        "</head>"
+        "<body>");
 
+    httpd_resp_sendstr_chunk(req,
+        "<h1>ESP32 Attack Monitor</h1>"
+
+        "<p>Request Count : <span id=\"request_count\">--</span></p>"
+        "<p>Free Heap : <span id=\"free_heap\">--</span> bytes</p>"
+        "<p>Uptime : <span id=\"uptime\">--:--:--</span></p>"
+        "<p>Wi-Fi RSSI : <span id=\"rssi\">--</span> dBm</p>"
+        "<p>IP Address : <span id=\"ip\">--</span></p>"
+
+        "<p>CPU Temp : <span id=\"cpu_temp\">--</span> ℃</p>"
+        "<p>CPU Usage : <span id=\"cpu_total\">--</span> %</p>"
+        "<p>Core 0 Usage : <span id=\"cpu_core0\">--</span> %</p>"
+        "<p>Core 1 Usage : <span id=\"cpu_core1\">--</span> %</p>"
+    );
+
+    httpd_resp_sendstr_chunk(req,
+        "<script>"
+
+        "async function update(){"
+
+        "try{"
+
+        "const res = await fetch('/data');"
+        "const data = await res.json();"
+
+        "document.getElementById('request_count').textContent=data.request_count;"
+        "document.getElementById('free_heap').textContent=data.free_heap;"
+
+        "const h=Math.floor(data.uptime_sec/3600);"
+        "const m=Math.floor((data.uptime_sec%3600)/60);"
+        "const s=data.uptime_sec%60;"
+
+        "document.getElementById('uptime').textContent="
+        "String(h).padStart(2,'0')+':'+" 
+        "String(m).padStart(2,'0')+':'+" 
+        "String(s).padStart(2,'0');"
+
+        "document.getElementById('rssi').textContent=data.rssi;"
+        "document.getElementById('ip').textContent=data.ip;"
+
+        "document.getElementById('cpu_temp').textContent=data.cpu_temp.toFixed(1);"
+        "document.getElementById('cpu_total').textContent=data.cpu_total.toFixed(1);"
+        "document.getElementById('cpu_core0').textContent=data.cpu_core0.toFixed(1);"
+        "document.getElementById('cpu_core1').textContent=data.cpu_core1.toFixed(1);"
+
+        "}catch(e){"
+        "console.log(e);"
+        "}"
+
+        "}"
+
+        "update();"
+        "setInterval(update,1000);"
+
+        "</script>"
+    );
+
+    httpd_resp_sendstr_chunk(req,
+        "</body>"
+        "</html>"
+    );
+
+    /* 終了 */
+    httpd_resp_sendstr_chunk(req, NULL);
+
+    return ESP_OK;
+}
+
+
+static esp_err_t data_get_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "data handler");
+
+    /*
+     * 現在の空きヒープメモリを取得
+     */
     size_t free_heap = esp_get_free_heap_size();
 
+
+    /*
+     * Wi-Fi RSSIを取得
+     */
     wifi_ap_record_t ap_info;
 
     if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
         ap_info.rssi = 0;
     }
 
-    esp_netif_ip_info_t ip_info;
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (netif != NULL &&
-        esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-        // ip_info.ip にIPアドレスが入る
-    }
+    /*
+     * ESP32起動後の経過時間を秒単位で取得
+     */
+    int64_t uptime_us = esp_timer_get_time();
+    int64_t uptime_sec = uptime_us / 1000000;
 
+
+    /*
+     * CPU内部温度を取得
+     */
     float cpu_temp = get_cpu_temprature();
 
-    snprintf(response, sizeof(response),
-             "<html><body>"
-             "<h1>ESP32 Attack Monitor</h1>"
-             "<p>Request Count : %d</p>"
-             "<p>Free Heap : %u bytes</p>"
-             "<p>Uptime : %02d:%02d:%02d</p>"
-             "<p>Wi-Fi RSSI : %d dBm</p>"
-             "<p>IP Address : " IPSTR "</p>"
-             "<p>CPU Temp :  %.1lf temp </p>"
-             "</body></html>",
-             request_count,
-             free_heap,
-             hour,
-             min,
-             sec,
-             ap_info.rssi,
-             IP2STR(&ip_info.ip),
-             cpu_temp);
+    /*
+     * JSON文字列を作成
+     */
+    char response[4096];
 
-    httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+     esp_netif_ip_info_t ip_info;
+     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+     if (netif != NULL &&
+        esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+        memset(&ip_info, 0, sizeof(ip_info));
+     }
+
+     snprintf(
+        response,
+        sizeof(response),
+
+        "{"
+        "\"request_count\":%d,"
+        "\"free_heap\":%u,"
+        "\"uptime_sec\":%lld,"
+        "\"rssi\":%d,"
+        "\"ip\":\"" IPSTR "\","
+        "\"cpu_temp\":%.1f,"
+        "\"cpu_total\":%.1f,"
+        "\"cpu_core0\":%.1f,"
+        "\"cpu_core1\":%.1f"
+        "}",
+
+        request_count,
+        (unsigned int)free_heap,
+        (long long)uptime_sec,
+        ap_info.rssi,
+        IP2STR(&ip_info.ip),
+        cpu_temp,
+        cpu_usage_get_total(),
+        cpu_usage_get_core0(),
+        cpu_usage_get_core1()
+    );
+
+
+    /*
+     * JSONとしてレスポンスを返す
+     */
+    httpd_resp_set_type(
+        req,
+        "application/json"
+    );
+
+    httpd_resp_send(
+        req,
+        response,
+        HTTPD_RESP_USE_STRLEN
+    );
 
     return ESP_OK;
 }
+
 
 static const httpd_uri_t status = {
     .uri = "/status",
     .method = HTTP_GET,
     .handler = status_get_handler,
+};
+
+static const httpd_uri_t data = {
+    .uri = "/data",
+    .method = HTTP_GET,
+    .handler = data_get_handler,
 };
 
 /* This handler allows the custom error handling functionality to be
@@ -523,6 +650,7 @@ static httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &hello);
         httpd_register_uri_handler(server, &status);
         httpd_register_uri_handler(server, &echo);
+        httpd_register_uri_handler(server, &data);
         httpd_register_uri_handler(server, &ctrl);
         httpd_register_uri_handler(server, &any);
 #if CONFIG_EXAMPLE_ENABLE_SSE_HANDLER
@@ -573,6 +701,7 @@ static void connect_handler(void* arg, esp_event_base_t event_base,
 void app_main(void)
 {
     static httpd_handle_t server = NULL;
+    cpu_usage_init();
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
