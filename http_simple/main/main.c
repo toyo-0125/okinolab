@@ -357,12 +357,10 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     httpd_resp_sendstr_chunk(req,
         "<h1>ESP32 Attack Monitor</h1>"
 
-        "<p>Request Count : <span id=\"request_count\">--</span></p>"
         "<p>Free Heap : <span id=\"free_heap\">--</span> bytes</p>"
         "<p>Uptime : <span id=\"uptime\">--:--:--</span></p>"
         "<p>Wi-Fi RSSI : <span id=\"rssi\">--</span> dBm</p>"
-        "<p>IP Address : <span id=\"ip\">--</span></p>"
-
+       
         "<p>CPU Temp : <span id=\"cpu_temp\">--</span> ℃</p>"
         "<p>CPU Usage : <span id=\"cpu_total\">--</span> %</p>"
         "<p>Core 0 Usage : <span id=\"cpu_core0\">--</span> %</p>"
@@ -379,7 +377,6 @@ static esp_err_t status_get_handler(httpd_req_t *req)
         "const res = await fetch('/data');"
         "const data = await res.json();"
 
-        "document.getElementById('request_count').textContent=data.request_count;"
         "document.getElementById('free_heap').textContent=data.free_heap;"
 
         "const h=Math.floor(data.uptime_sec/3600);"
@@ -392,7 +389,6 @@ static esp_err_t status_get_handler(httpd_req_t *req)
         "String(s).padStart(2,'0');"
 
         "document.getElementById('rssi').textContent=data.rssi;"
-        "document.getElementById('ip').textContent=data.ip;"
 
         "document.getElementById('cpu_temp').textContent=data.cpu_temp.toFixed(1);"
         "document.getElementById('cpu_total').textContent=data.cpu_total.toFixed(1);"
@@ -472,22 +468,18 @@ static esp_err_t data_get_handler(httpd_req_t *req)
         sizeof(response),
 
         "{"
-        "\"request_count\":%d,"
         "\"free_heap\":%u,"
         "\"uptime_sec\":%lld,"
         "\"rssi\":%d,"
-        "\"ip\":\"" IPSTR "\","
         "\"cpu_temp\":%.1f,"
         "\"cpu_total\":%.1f,"
         "\"cpu_core0\":%.1f,"
         "\"cpu_core1\":%.1f"
         "}",
 
-        request_count,
         (unsigned int)free_heap,
         (long long)uptime_sec,
         ap_info.rssi,
-        IP2STR(&ip_info.ip),
         cpu_temp,
         cpu_usage_get_total(),
         cpu_usage_get_core0(),
