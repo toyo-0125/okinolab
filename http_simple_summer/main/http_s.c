@@ -6,7 +6,7 @@
 #include "protocol_examples_utils.h"
 #include <sys/param.h>
 #include "esp_timer.h"
-
+#include <stdbool.h>
 
 
 #include "temprature.h"
@@ -19,8 +19,12 @@ static const char *TAG = "http_server";
 static int request_count = 0;
 static httpd_handle_t server = NULL;
 
-wifi_ap_record_t ap_info;
+bool http_server_is_running(void)
+{
+    return server != NULL;
+}
 
+wifi_ap_record_t ap_info;
 
 /* An HTTP GET handler */
 static esp_err_t hello_get_handler(httpd_req_t *req)
