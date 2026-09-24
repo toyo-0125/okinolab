@@ -8,6 +8,7 @@
 //making point
 #include "http_s.h"
 #include "cpu_usage.h"
+#include "watchdog.h"
 
 
 void app_main(void)
@@ -21,6 +22,8 @@ void app_main(void)
     ESP_ERROR_CHECK(example_connect());
 
     http_server_start();
+
+    watchdog_start();
 
     while (1) {
         sleep(5);

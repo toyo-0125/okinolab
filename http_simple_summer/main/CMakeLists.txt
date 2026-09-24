@@ -13,5 +13,6 @@ idf_component_register(
         "temprature.c"
         "cpu_usage.c"
         "http_s.c"
+        "watchdog.c"
         INCLUDE_DIRS "."
         PRIV_REQUIRES ${requires})
